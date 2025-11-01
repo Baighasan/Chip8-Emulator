@@ -5,11 +5,13 @@
 
 #include "SDL.h"
 
+// SDL Container object
 typedef struct {
 	SDL_Window *window;
 	SDL_Renderer *renderer;
 } sdl_t;
 
+// Emulator Configuration object
 typedef struct {
 	uint32_t window_width;	// SDL Window width
 	uint32_t window_height;	// SDL Window height
@@ -17,6 +19,18 @@ typedef struct {
 	uint32_t bg_color;		// Background color RGBA8888
 	uint32_t scale_factor;	// Amount to scale a CHIP8 pixel by e.g. 20x will be a 20x larger window
 } config_t;
+
+// Emulator State
+typedef enum {
+	QUIT,
+	RUNNING,
+	PAUSED,
+} emulator_state_t;
+
+// CHIP8 Machine Object
+typedef struct {
+	emulator_state_t state;
+} chip8_t;
 
 // Initialize SDL
 bool init_sdl(sdl_t *sdl, const config_t config) {
@@ -60,7 +74,7 @@ bool set_config_from_args(config_t *config, const int argc, char **argv) {
 	// Set defaults
 	*config = (config_t) {
 		.window_width = 64,		// CHIP8 original X resolution
-	.window_height = 32,		// CHIP8 original y resolution
+		.window_height = 32,	// CHIP8 original y resolution
 		.fg_color = 0xFFFFFFFF,	// YELLOW
 		.bg_color = 0xFFFF00FF,	// BLACK
 		.scale_factor = 20,		// Default resolution will be 1280x640
@@ -72,6 +86,12 @@ bool set_config_from_args(config_t *config, const int argc, char **argv) {
 		// ...
 	}
 
+	return true;	// Success
+}
+
+// Initialize CHIP8 machine
+bool init_chip8(chip8_t *chip8) {
+	chip8->state = RUNNING;	// Default machine state to on/running
 	return true;	// Success
 }
 
@@ -91,11 +111,47 @@ void update_screen(const sdl_t sdl) {
 	SDL_RenderPresent(sdl.renderer);
 }
 
+// Handle user input
+void handle_input(chip8_t *chip8) {
+	SDL_Event event;
+
+	while (SDL_PollEvent(&event)) {
+		switch (event.type) {
+			case SDL_QUIT:
+				// Exit window; End Program
+				chip8->state = QUIT; // Will quit main emulator loop
+				return;
+
+			case SDL_KEYDOWN:
+				switch (event.key.keysym.sym) {
+					case SDLK_ESCAPE:
+						// Escape key; Exit window & End program
+						chip8->state = QUIT;
+						return;
+					
+					default:
+						break;
+				}
+				break;
+
+			case SDL_KEYUP:
+				break;
+			
+			default:
+				break;
+		}
+	}
+}
+
 // Da main squeeze
 int main(int argc, char **argv) {
 	// Initialize emulator configuration
 	config_t config = {0};
 	if (!set_config_from_args(&config, argc, argv)) exit(EXIT_FAILURE);
+
+	// Initialize CHIP8 machine
+	chip8_t chip8 = {0};
+	if (!init_chip8(&chip8)) exit(EXIT_FAILURE);
 
 	// Initialize SDL
 	sdl_t sdl = {0};
@@ -105,7 +161,13 @@ int main(int argc, char **argv) {
 	clear_screen(sdl, config);
 
 	//Main emulator loop
-	while (true) {
+	while (chip8.state != QUIT) {
+		// Hande user inut
+		handle_input(&chip8);
+
+		// if (chip8.state == PAUSED) continue;
+
+
 		// get_time();
 		// Emulate CHIP8 Instructions
 		// get_time() elapsed since last get_time()
